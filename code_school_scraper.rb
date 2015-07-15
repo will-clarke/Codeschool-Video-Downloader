@@ -1,95 +1,108 @@
 require 'nokogiri'
 require 'watir-webdriver'
+require 'open-uri'
 
-url = 'https://www.codeschool.com/code_tv'
-selector = '.bucket-header--truncate a'
-urls = []
+class CodeSchoolDownloader
+  attr_accessor :browser
 
-page = Nokogiri::HTML.parse(open(url))
+  TIMEOUT = 40
+  def initialize
+    @browser = Watir::Browser.new
+    login
+    download_screencasts
+  end
 
-page.css(selector).each do |element|
-    urls <<  'http://www.codeschool.com' + element.attributes['href'].value
+  def download_screencasts
+    deal_with_courses
+    deal_with_screencasts
+  end
+
+  def login
+    @browser.goto 'http://www.codeschool.com/users/sign_in'
+
+    t = @browser.text_field :id => 'user_login'
+    t.exists?
+    p 'Please put in your username:'
+    username = gets.chomp
+    t.set username
+
+    t = @browser.text_field :id => 'user_password'
+    t.exists?
+    p 'Please put in your password:'
+    password = gets.chomp
+    t.set password
+
+    @browser.button(class: 'form-btn').click
+  end
+
+  def deal_with_screencasts
+    LinkGenerator.screencast_urls.each do |url|
+      p url
+      @browser.goto url
+      l = @browser.div(class: 'video-controls--download').links[0] #was links[1]
+      l.click if l.exists?
+      l = @browser.a(text: "Standard Definition")
+      l.click if l.exists?
+
+      sleep timeout
+    end
+  end
+
+  def deal_with_courses
+    LinkGenerator.course_urls.each do |url|
+      p url
+      @browser.goto url
+      link = nil
+      count = 0
+      while(link == nil) do
+        begin
+          video_link = @browser.elements(css: '.sticker--video')[count]
+          video_link.click if video_link.exists?
+          count += 1
+          l = @browser.div(class: 'video-controls--download').links[0] #was links[1]
+          l.click if l.exists?
+          l = @browser.a(text: "Standard Definition")
+          l.click if l.exists?
+          sleep timeout
+        rescue => e
+          require 'pry'; binding.pry
+        end
+      end
+    end
+  end
+
+  def timeout
+    1
+    # TIMEOUT + rand(20)
+  end
 end
 
 
-b = Watir::Browser.new
+class LinkGenerator
+  def self.screencast_urls
+    screencast_url = 'https://www.codeschool.com/screencasts/all'
+    screencast_selector = '.screencast-cover'
+    screencast_urls = []
+    screencast_page = Nokogiri::HTML.parse(open(screencast_url))
+
+    screencast_page.css(screencast_selector).each do |element|
+      screencast_urls << 'http://www.codeschool.com' + element.attributes['href'].value
+    end
+    screencast_urls
+  end
 
 
+  def self.course_urls
+    course_url = 'https://www.codeschool.com/courses'
+    course_selector = '.course-title-link'
+    course_urls = []
+    course_page = Nokogiri::HTML.parse(open(course_url))
 
-# LOGGING IN
-# ========================================================
-
-b.goto 'http://www.codeschool.com'
-b.a(class:'form--authMini-toggle').click
-
-t = b.text_field :id => 'user_login'
-t.exists?
-t.set 'wmmclarke'
-
-t = b.text_field :id => 'user_password'
-t.exists?
-t.set 'password'
-
-b.input(class: 'btn--submit').click
-
-
-# LOOPING
-# ========================================================
-
-# urls = File.open('screencasts.txt').read
-# urls = urls.split(/\n/)
-
-urls.each do |url|
-
-	p url
-	b.goto url
-	l = b.div(class: 'video-download').links[0] #was links[1]
-	l.click if l.exists?
-	sleep 30 + rand(20)
+    course_page.css(course_selector).each do |element|
+      course_urls << 'http://www.codeschool.com' + element.attributes['href'].value + '/videos'
+    end
+    course_urls
+  end
 end
 
-
-
-
-# b.goto 'http://www.codeschool.com/code_tv/cocoapods'
-
-# l = b.div(class: 'video-download').links[1]
-# l.click if l.exists?
-
-
-
-
-
-
-
-
-
-# require 'mechanize'
-
-# @agent = Mechanize.new
-# @agent.ssl_version= false
-
-# username = 'wmmclarke'
-# password = 'password'
-
-
-# page = @agent.get 'http://www.codeschool.com'
-# form = page.forms[0]
-# form['user[login]'] = username
-# form['user[password]'] = password
-# # 
-# next_page = @agent.submit form
-
-# ########## We've now logged in....
-
-# @agent.get 'http://www.codeschool.com/code_tv/cocoapods'
-
-# urls = File.open('screencasts.txt').read
-# urls = urls.split(/\n/)
-
-# urls.each do |url|
-# 	page = @agent.get url
-# 	page.search
-# end
-
-# # Mechanize.new{|a| a.ssl_version, a.verify_mode = 'SSLv3', OpenSSL::SSL::VERIFY_NONE}
+CodeSchoolDownloader.new
