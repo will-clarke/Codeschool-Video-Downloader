@@ -2,6 +2,11 @@ require 'nokogiri'
 require 'watir-webdriver'
 require 'open-uri'
 
+# Todo :
+# Don't bother using watir (although it's fun mucking around with it).
+# Find the links to download hidden in the HTML with nokogiri
+# projector.codeschool.com/videos
+
 class CodeSchoolDownloader
   attr_accessor :browser
 
