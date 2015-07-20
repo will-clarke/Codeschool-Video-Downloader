@@ -1,84 +1,85 @@
 require 'nokogiri'
 require 'watir-webdriver'
 require 'open-uri'
-
-# Todo :
-# Don't bother using watir (although it's fun mucking around with it).
-# Find the links to download hidden in the HTML with nokogiri
-# projector.codeschool.com/videos
+require 'open_uri_redirections'
 
 class CodeSchoolDownloader
   attr_accessor :browser
-
+  DOWNLOAD_LOCATION = Dir.home + '/Desktop/Codeschool'
   TIMEOUT = 40
-  def initialize
+
+  def initialize username, password
     @browser = Watir::Browser.new
-    login
-    download_screencasts
+    login username, password
+    create_dir DOWNLOAD_LOCATION
+    download_videos
   end
 
-  def download_screencasts
-    deal_with_courses
+  def download_videos
     deal_with_screencasts
+    deal_with_courses
   end
 
-  def login
+  def login username, password
     @browser.goto 'http://www.codeschool.com/users/sign_in'
 
     t = @browser.text_field :id => 'user_login'
-    t.exists?
-    p 'Please put in your username:'
-    username = gets.chomp
     t.set username
 
     t = @browser.text_field :id => 'user_password'
-    t.exists?
-    p 'Please put in your password:'
-    password = gets.chomp
     t.set password
 
     @browser.button(class: 'form-btn').click
   end
 
   def deal_with_screencasts
+    dir_name = DOWNLOAD_LOCATION + '/screencasts'
+    create_dir dir_name
     LinkGenerator.screencast_urls.each do |url|
-      p url
-      @browser.goto url
-      l = @browser.div(class: 'video-controls--download').links[0] #was links[1]
-      l.click if l.exists?
-      l = @browser.a(text: "Standard Definition")
-      l.click if l.exists?
-
-      sleep timeout
+      download url, dir_name, url.split('/').last.gsub('-', ' ')
     end
   end
 
   def deal_with_courses
+    dir_name = DOWNLOAD_LOCATION + '/courses'
+    create_dir dir_name
     LinkGenerator.course_urls.each do |url|
-      p url
-      @browser.goto url
-      link = nil
-      count = 0
-      while(link == nil) do
-        begin
-          video_link = @browser.elements(css: '.sticker--video')[count]
-          video_link.click if video_link.exists?
-          count += 1
-          l = @browser.div(class: 'video-controls--download').links[0] #was links[1]
-          l.click if l.exists?
-          l = @browser.a(text: "Standard Definition")
-          l.click if l.exists?
-          sleep timeout
-        rescue => e
-          require 'pry'; binding.pry
+      download url, dir_name
+    end
+  end
+
+  def download url, dir_name, passed_in_filename = nil
+    p url
+    @browser.goto url
+    html = @browser.html
+    page = Nokogiri::HTML.parse(html)
+    sub_dir_name =  dir_name + '/' + page.css('h1').text.gsub('Screencast', '').strip.gsub(/\W/, ' ').gsub(/\s+/, ' ').gsub(/\s/, '-')
+    create_dir sub_dir_name
+    filenames = page.css('.tct').map(&:text)
+    page.css('.cs-video-player').map.with_index do |link, index|
+      begin
+        url = link.children[3].attributes['src'].value
+        name = passed_in_filename ? passed_in_filename : "#{index.to_s.ljust 2}- #{filenames[index]}"
+        filename = "#{sub_dir_name}/#{name}.mp4"
+        File.open(filename, 'wb') do |f|
+          f.write(open(url, allow_redirections: :all).read)
         end
+      rescue => e
+        p e
       end
+      sleep timeout
+    end
+
+  end
+
+  def create_dir filename
+    unless File.exists? filename
+      FileUtils.mkdir filename
     end
   end
 
   def timeout
-    1
-    # TIMEOUT + rand(20)
+    TIMEOUT + rand(20)
   end
 end
 
@@ -110,4 +111,4 @@ class LinkGenerator
   end
 end
 
-CodeSchoolDownloader.new
+CodeSchoolDownloader.new(*ARGV)
