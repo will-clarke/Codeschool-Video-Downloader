@@ -58,7 +58,7 @@ class CodeSchoolDownloader
     filenames = page.css('.tct').map(&:text)
     page.css('.cs-video-player').map.with_index do |link, index|
       begin
-        url = link.children[3].attributes['src'].value
+        url = link.children[0].children[0].attributes['src'].value
         name = passed_in_filename ? passed_in_filename : "#{index.to_s.ljust 2}- #{filenames[index]}"
         filename = "#{sub_dir_name}/#{name}.mp4"
         File.open(filename, 'wb') do |f|
