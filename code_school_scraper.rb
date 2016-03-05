@@ -85,7 +85,7 @@ class CodeSchoolDownloader
           puts "Saving #{filename}..."
         end
       rescue => e
-        p e
+        p e.inspect
       end
       counter += 1
     end
