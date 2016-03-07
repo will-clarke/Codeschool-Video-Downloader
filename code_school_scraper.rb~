@@ -72,7 +72,7 @@ class CodeSchoolDownloader
           puts "Videos left #{(videos_total - counter - 1).to_s}"
         end
         course.when_present.fire_event("click")
-        sleep 0
+        sleep 1
         video_page = Nokogiri::HTML.parse(@browser.html)
         url = video_page.css('div#level-video-player video').attribute('src').value
 	url = url.gsub('profile=480p','profile=720p')
