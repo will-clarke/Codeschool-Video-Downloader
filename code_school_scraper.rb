@@ -2,10 +2,11 @@ require 'nokogiri'
 require 'watir-webdriver'
 require 'open-uri'
 require 'open_uri_redirections'
+require "net/http"
 
 class CodeSchoolDownloader
   attr_accessor :browser
-  DOWNLOAD_LOCATION = Dir.home + '/Desktop/Codeschool'
+  DOWNLOAD_LOCATION = Dir.home + '/Desktop/Codeschool3'
   TIMEOUT = 0
 
   def initialize username, password
@@ -71,10 +72,19 @@ class CodeSchoolDownloader
           puts "Videos left #{(videos_total - counter - 1).to_s}"
         end
         course.when_present.fire_event("click")
-        sleep 1
+        sleep 0
         video_page = Nokogiri::HTML.parse(@browser.html)
         url = video_page.css('div#level-video-player video').attribute('src').value
-        puts "URL retrieved"
+	url = url.gsub('profile=480p','profile=720p')
+	uri = URI.parse(url)
+	http = Net::HTTP.new(uri.host, uri.port)
+	http.use_ssl = true
+	request = Net::HTTP::Get.new(uri.request_uri)
+	res = http.request(request)
+	puts url
+	url = url.gsub('profile=720p','profile=480p') if res.code != "302"
+	puts url        
+	puts "URL retrieved"
         puts "Closing video..."
         @browser.links(:class, "modal-close")[3].when_present.fire_event("click")
         name = passed_in_filename ? passed_in_filename : "#{(counter + 1).to_s.ljust 2}- #{filenames[counter]}"
