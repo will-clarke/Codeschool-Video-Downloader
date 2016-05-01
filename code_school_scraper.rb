@@ -101,7 +101,6 @@ class CodeSchoolDownloader
     html = @browser.html
     page = Nokogiri::HTML.parse(html)
     sub_dir_name =  dir_name + '/' + page.css('h1 span:last').text.gsub(/\//,'-')
-    #binding.pry
     create_dir sub_dir_name
     begin
       puts "Opening video..."
