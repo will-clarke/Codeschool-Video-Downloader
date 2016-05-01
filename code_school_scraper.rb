@@ -36,7 +36,7 @@ class CodeSchoolDownloader
     dir_name = DOWNLOAD_LOCATION + '/screencasts'
     create_dir dir_name
     LinkGenerator.screencast_urls.each do |url|
-      download url, dir_name, url.split('/').last.gsub('-', ' ')
+      download_screencasts url, dir_name, url.split('/').last.gsub('-', ' ')
     end
   end
 
@@ -91,6 +91,37 @@ class CodeSchoolDownloader
     end
   end
 
+
+  def download_screencasts url, dir_name, passed_in_filename = nil
+    puts "\nCourse"
+    p url
+    puts
+
+    @browser.goto url
+    html = @browser.html
+    page = Nokogiri::HTML.parse(html)
+    sub_dir_name =  dir_name + '/' + page.css('h1 span:last').text.gsub(/\//,'-')
+    #binding.pry
+    create_dir sub_dir_name
+    begin
+      puts "Opening video..."
+      video_page = Nokogiri::HTML.parse(@browser.html)
+      video_url = video_page.css('div#code-school-screencasts video').attribute('src').value
+      puts "VIDEO URL retrieved"
+      puts "Closing video..."
+      @browser.back
+      name = page.css('h1').text.gsub('Screencast', '').strip.gsub(/\W/, ' ').gsub(/\s+/, ' ').gsub(/\s/, '-')
+      filename = "#{sub_dir_name}/#{name}.mp4"
+      File.open(filename, 'wb') do |f|
+        puts "Downloading video #{name}..."
+        f.write(open(video_url, allow_redirections: :all).read)
+        puts "Saving #{filename}..."
+      end
+    rescue => e
+      p e.inspect
+    end
+  end
+
   def create_dir filename
     unless File.exists? filename
       FileUtils.mkdir filename
@@ -106,7 +137,7 @@ end
 class LinkGenerator
   def self.screencast_urls
     screencast_url = 'https://www.codeschool.com/screencasts/all'
-    screencast_selector = '.screencast-cover'
+    screencast_selector = 'article.screencast a'
     screencast_urls = []
     screencast_page = Nokogiri::HTML.parse(open(screencast_url))
 
