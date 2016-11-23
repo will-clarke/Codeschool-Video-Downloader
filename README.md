@@ -9,14 +9,14 @@ This assumes you've got a codeschool account.
 
 Run this script from the command line with your codeschool username & password:
 
-    # install homebrew:
+    # install homebrew
     /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     brew install chromedriver
 
     gem install bundler  # get bundler to install gems automatically
     bundle install       # install the dependencies
 
-    ruby code_school_scraper.rb *your_username* *your_password*
+    ruby codeschool_downloader.rb **your_username** **your_password**
 
 It will, by default, shove all the files on your desktop into sensibly-named folders (assuming you're on a mac...)
 
