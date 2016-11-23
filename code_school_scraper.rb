@@ -1,18 +1,17 @@
 require 'nokogiri'
-require 'watir-webdriver'
+require 'watir'
 require 'open-uri'
 require 'open_uri_redirections'
 
 class CodeSchoolDownloader
-  attr_accessor :browser
+  attr_reader :browser
   DOWNLOAD_LOCATION = Dir.home + '/Desktop/Codeschool'
   TIMEOUT = 0
 
-  def initialize username, password
+  def initialize(username = '', password = '')
     @browser = Watir::Browser.new
     login username, password
     create_dir DOWNLOAD_LOCATION
-    download_videos
   end
 
   def download_videos
@@ -20,108 +19,97 @@ class CodeSchoolDownloader
     deal_with_courses
   end
 
-  def login username, password
-    @browser.goto 'https://www.codeschool.com/users/sign_in'
-
-    t = @browser.text_field :id => 'user_login'
+  def login(username, password)
+    browser.goto 'https://www.codeschool.com/users/sign_in'
+    t = browser.text_field id: 'user_login'
     t.set username
-
-    t = @browser.text_field :id => 'user_password'
+    t = browser.text_field id: 'user_password'
     t.set password
-
-    @browser.button(class: 'form-btn').click
+    browser.button(class: 'form-btn').click
   end
 
   def deal_with_screencasts
     dir_name = DOWNLOAD_LOCATION + '/screencasts'
     create_dir dir_name
-    LinkGenerator.screencast_urls.each do |url|
-      download_screencasts url, dir_name, url.split('/').last.gsub('-', ' ')
+    puts "\nScreencasts"
+    LinkGenerator.screencast_urls(browser).each do |url|
+      file_name = url.split('/').last.gsub('-', ' ')
+      download_screencasts url, dir_name, file_name
     end
   end
 
   def deal_with_courses
     dir_name = DOWNLOAD_LOCATION + '/courses'
     create_dir dir_name
-    LinkGenerator.course_urls.each do |url|
-      download url, dir_name
+    puts "\nCourse"
+    LinkGenerator.course_urls(browser).each do |url|
+      download_course url, dir_name
     end
   end
 
-  def download url, dir_name, passed_in_filename = nil
-    puts "\nCourse"
-    p url
-    puts
-
-    @browser.goto url
-    html = @browser.html
+  def download_course(course_url, dir_name, passed_in_filename = nil)
+    browser.goto course_url
+    html = browser.html
     page = Nokogiri::HTML.parse(html)
-    sub_dir_name =  dir_name + '/' + page.css('h1').text.gsub('Screencast', '').strip.gsub(/\W/, ' ').gsub(/\s+/, ' ').gsub(/\s/, '-')
+    course_name = page.css('h1').text.gsub('Screencast', '').
+                    strip.gsub(/\W/, ' ').gsub(/\s+/, ' ').gsub(/\s/, '-')
+    sub_dir_name = dir_name + '/' + course_name
     create_dir sub_dir_name
     filenames = page.css('.tct').map(&:text)
-    counter = 0
-    links = @browser.links(:class, "js-level-open")
+    links = browser.links(:class, 'js-level-open')
     videos_total = links.size
-    links.each do |course|
+    videos_total.times do |index|
       begin
-        puts "Opening video..."
-        if videos_total - counter - 1 == 0
-          puts "This is the last lesson from this course"
-        else
-          puts "Videos left #{(videos_total - counter - 1).to_s}"
-        end
-        course.when_present.fire_event("click")
+        browser.goto course_url
+        html = browser.html
+        page = Nokogiri::HTML.parse(html)
+        links = browser.links(:class, 'js-level-open')
+        link = links[index]
+        link.click
         sleep 1
-        video_page = Nokogiri::HTML.parse(@browser.html)
+        video_page = Nokogiri::HTML.parse(browser.html)
+        sleep 1
         url = video_page.css('div#level-video-player video').attribute('src').value
-        puts "URL retrieved"
-        puts "Closing video..."
-        @browser.links(:class, "modal-close")[3].when_present.fire_event("click")
-        name = passed_in_filename ? passed_in_filename : "#{(counter + 1).to_s.ljust 2}- #{filenames[counter]}"
+        name = passed_in_filename ? passed_in_filename : "#{(index + 1).to_s.ljust 2}- #{filenames[index]}"
         filename = "#{sub_dir_name}/#{name}.mp4"
         File.open(filename, 'wb') do |f|
-          puts "Downloading video #{name}..."
           f.write(open(url, allow_redirections: :all).read)
-          puts "Saving #{filename}..."
+          puts "  #{name}"
         end
       rescue => e
-        p e.inspect
+        p e
       end
-      counter += 1
     end
   end
-
 
   def download_screencasts url, dir_name, passed_in_filename = nil
-    puts "\nCourse"
-    p url
-    puts
-
-    @browser.goto url
-    html = @browser.html
+    browser.goto url
+    html = browser.html
     page = Nokogiri::HTML.parse(html)
-    sub_dir_name =  dir_name + '/' + page.css('h1 span:last').text.gsub(/\//,'-')
+    file_name = page.css('h1 .has-tag--heading').text
+    directory = page.css('h1 .tag').text.gsub(/\W/, '-')
+    sub_dir_name = dir_name + '/' + directory
     create_dir sub_dir_name
+    filename = (sub_dir_name + '/' + file_name + '.mp4').gsub(/[^\w\/\.]+/, '-')
     begin
-      puts "Opening video..."
-      video_page = Nokogiri::HTML.parse(@browser.html)
-      video_url = video_page.css('div#code-school-screencasts video').attribute('src').value
-      puts "VIDEO URL retrieved"
-      puts "Closing video..."
-      @browser.back
-      name = page.css('h1').text.gsub('Screencast', '').strip.gsub(/\W/, ' ').gsub(/\s+/, ' ').gsub(/\s/, '-')
-      filename = "#{sub_dir_name}/#{name}.mp4"
+      sleep 1
+      video_page = Nokogiri::HTML.parse(browser.html)
+      sleep 1
+      video_div = video_page.css('div#code-school-screencasts video')
+      video_url = video_div && video_div.any? && video_div.attribute('src') &&
+                  video_div.attribute('src').value
+      browser.back
+      return unless video_url
       File.open(filename, 'wb') do |f|
-        puts "Downloading video #{name}..."
+        puts "  #{url}"
         f.write(open(video_url, allow_redirections: :all).read)
-        puts "Saving #{filename}..."
       end
     rescue => e
-      p e.inspect
+      p e
     end
   end
 
-  def create_dir filename
+  def create_dir(filename)
     unless File.exists? filename
       FileUtils.mkdir filename
     end
@@ -132,27 +120,38 @@ class CodeSchoolDownloader
   end
 end
 
-
 class LinkGenerator
-  def self.screencast_urls
-    screencast_url = 'https://www.codeschool.com/screencasts/all'
-    screencast_selector = 'article.screencast a'
-    screencast_urls = []
-    screencast_page = Nokogiri::HTML.parse(open(screencast_url))
 
-    screencast_page.css(screencast_selector).each do |element|
-      screencast_urls << 'https://www.codeschool.com' + element.attributes['href'].value
+  def self.screencast_urls_from_page(browser)
+    screencast_page = Nokogiri::HTML.parse(browser.html)
+    screencast_page.css('.twl').map do |element|
+      'https://www.codeschool.com' + element.attributes['href'].value
     end
-    screencast_urls
   end
 
+  def self.screencast_urls(browser)
+    screencast_urls = []
+    screencast_url = 'https://www.codeschool.com/screencasts'
+    browser.goto screencast_url
+    sleep 1
+    screencast_urls << screencast_urls_from_page(browser)
+    links = browser.links(class: 'video-page-link')
+    loop do
+      links = browser.links(class: 'video-page-link')
+      next_button = links.select {|i| i.text == 'Next→' }.first
+      break unless next_button
+      next_button.click
+      sleep 2
+      screencast_urls << screencast_urls_from_page(browser)
+    end
+    screencast_urls.flatten.uniq
+  end
 
-  def self.course_urls
+  def self.course_urls(browser)
     course_url = 'https://www.codeschool.com/courses'
     course_selector = '.course-title-link'
     course_urls = []
     course_page = Nokogiri::HTML.parse(open(course_url))
-
     course_page.css(course_selector).each do |element|
       course_urls << 'https://www.codeschool.com' + element.attributes['href'].value + '/videos'
     end
@@ -160,4 +159,4 @@ class LinkGenerator
   end
 end
 
-CodeSchoolDownloader.new(*ARGV)
+CodeSchoolDownloader.new(*ARGV).download_videos
