@@ -163,7 +163,7 @@ class Course < VideoDownloader
 
   def video_directory
     page_html.css('h1').text.gsub('Screencast', '').gsub('C#', 'C-Sharp').
-    strip.gsub(/\W/, ' ').gsub(/\s+/, ' ').gsub(/\s/, '-')
+      strip.gsub(/\W/, ' ').gsub(/\s+/, ' ').gsub(/\s/, '-')
   end
 
   def click_link(index)
