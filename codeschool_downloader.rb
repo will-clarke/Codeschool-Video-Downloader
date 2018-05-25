@@ -163,6 +163,7 @@ class Course < VideoDownloader
 
   def video_directory
     page_html.css('h1').text.gsub('Screencast', '').gsub('C#', 'C-Sharp').
+      gsub('.NET', 'DotNet').
       strip.gsub(/\W/, ' ').gsub(/\s+/, ' ').gsub(/\s/, '-')
   end
 
